@@ -13,7 +13,7 @@ Chetak is a location-based smart travel alarm app built with React Native. It tr
 - **Saved Places**: Save frequently visited locations for quick access.
 - **Multiple Journeys**: Track multiple active journeys simultaneously.
 
-[Download APK] (https://drive.google.com/file/d/1xpiFtgdzqYJEeTSpxfB5kPsYTWfij3Pb/view?usp=sharing)
+[Download APK](https://drive.google.com/file/d/1xpiFtgdzqYJEeTSpxfB5kPsYTWfij3Pb/view?usp=sharing)
 
 ## Screenshot
 <img width="1376" height="3058" alt="Gemini_Generated_Image_zc0lxazc0lxazc0l" src="https://github.com/user-attachments/assets/8bf779ea-e19c-4f7f-a1d5-0c736f0d576c" />
