@@ -13,14 +13,10 @@ Chetak is a location-based smart travel alarm app built with React Native. It tr
 - **Saved Places**: Save frequently visited locations for quick access.
 - **Multiple Journeys**: Track multiple active journeys simultaneously.
 
-[Download APK (https://drive.google.com/file/d/1xpiFtgdzqYJEeTSpxfB5kPsYTWfij3Pb/view?usp=sharing)]
+[Download APK] (https://drive.google.com/file/d/1xpiFtgdzqYJEeTSpxfB5kPsYTWfij3Pb/view?usp=sharing)
 ## Screenshot
-<img width="720" height="1600" alt="WhatsApp Image 2026-07-22 at 21 29 28" src="https://github.com/user-attachments/assets/3cec6bf5-10fa-4bbf-9fc6-65e0d4e92723" />
-<img width="720" height="1600" alt="WhatsApp Image 2026-07-22 at 21 29 29" src="https://github.com/user-attachments/assets/27359243-9c12-4c9a-a4c3-42b88679c80a" />
-<img width="720" height="1600" alt="WhatsApp Image 2026-07-22 at 21 29 31" src="https://github.com/user-attachments/assets/d6a00a64-6c68-4299-8f61-85a125f0d1de" />
-<img width="720" height="1600" alt="WhatsApp Image 2026-07-22 at 21 29 33 (1)" src="https://github.com/user-attachments/assets/73ea065b-a327-4c05-a409-37e15b279356" />
-<img width="720" height="1600" alt="WhatsApp Image 2026-07-22 at 21 29 33" src="https://github.com/user-attachments/assets/3aadd2be-45ed-4083-9932-47a2f529df7b" />
-<img width="1242" height="2688" alt="N2IPVdu0DbPX_1242_2688" src="https://github.com/user-attachments/assets/0ecf2561-aa6d-4178-8e36-20485d89873c" />
+
+![Uploading Gemini_Generated_Image_zc0lxazc0lxazc0l.png…]()
 
 
 ## Tech Stack
