@@ -1,45 +1,38 @@
-/**
- * Sample React Native App
- * https://github.com/facebook/react-native
- *
- * @format
- */
+import React, { useEffect } from 'react';
+import { StatusBar } from 'react-native';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { AppProvider } from '@store/AppContext';
+import AppNavigator from '@navigation/AppNavigator';
+import SplashScreen from 'react-native-splash-screen';
+import notifee, { EventType } from '@notifee/react-native';
+import AudioService from '@services/AudioService';
 
-import { NewAppScreen } from '@react-native/new-app-screen';
-import { StatusBar, StyleSheet, useColorScheme, View } from 'react-native';
-import {
-  SafeAreaProvider,
-  useSafeAreaInsets,
-} from 'react-native-safe-area-context';
+function App(): React.JSX.Element {
+  useEffect(()=>{
+    setTimeout(()=>{
+      SplashScreen.hide();
+    },1500)
 
-function App() {
-  const isDarkMode = useColorScheme() === 'dark';
+    const unsubscribe = notifee.onForegroundEvent(({ type, detail }) => {
+      if (type === EventType.ACTION_PRESS && detail.pressAction?.id === 'stop_alarm') {
+        AudioService.stopAlarm();
+        if (detail.notification?.id) {
+          notifee.cancelNotification(detail.notification.id);
+        }
+      }
+    });
+
+    return unsubscribe;
+  },[]);
 
   return (
     <SafeAreaProvider>
-      <StatusBar barStyle={isDarkMode ? 'light-content' : 'dark-content'} />
-      <AppContent />
+      <StatusBar translucent={true} backgroundColor="transparent" barStyle="dark-content" />
+      <AppProvider>
+        <AppNavigator />
+      </AppProvider>
     </SafeAreaProvider>
   );
 }
-
-function AppContent() {
-  const safeAreaInsets = useSafeAreaInsets();
-
-  return (
-    <View style={styles.container}>
-      <NewAppScreen
-        templateFileName="App.tsx"
-        safeAreaInsets={safeAreaInsets}
-      />
-    </View>
-  );
-}
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-});
 
 export default App;

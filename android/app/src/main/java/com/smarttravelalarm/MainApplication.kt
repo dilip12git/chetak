@@ -1,5 +1,4 @@
-package com.smarttravelalarm
-
+package com.Chetak
 import android.app.Application
 import com.facebook.react.PackageList
 import com.facebook.react.ReactApplication
