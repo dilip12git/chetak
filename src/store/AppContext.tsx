@@ -1,6 +1,7 @@
 import React, { createContext, useState, useEffect, ReactNode } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { AppSettings, SavedPlace, ActiveJourney } from '@appTypes';
+import { Appearance, DeviceEventEmitter } from 'react-native';
 
 interface AppContextProps {
   settings: AppSettings;
@@ -13,11 +14,16 @@ interface AppContextProps {
   updateJourneyStatus: (id: string, isActive: boolean) => Promise<void>;
 }
 
+const systemTheme = Appearance.getColorScheme();
+
 const defaultSettings: AppSettings = {
-  darkMode: false,
+  darkMode: systemTheme === 'dark',
   alarmVolume: 1.0,
   alarmSound: 'default',
+  alarmSoundName: 'Default Tone',
+  soundAlert: true,
   voiceAlert: true,
+  vibrationMode: true,
   defaultRadius: 500,
 };
 
@@ -39,12 +45,29 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
 
   useEffect(() => {
     loadData();
+
+    const stopSub = DeviceEventEmitter.addListener('ALARM_STOPPED', (data) => {
+      if (data && data.journey) {
+        // Need to use functional update to avoid stale closures
+        setActiveJourneys(prev => {
+          const updated = prev.map(j => j.id === data.journey.id ? { ...j, isActive: false } : j);
+          if (updated.length > 0) {
+            AsyncStorage.setItem('@activeJourneys', JSON.stringify(updated));
+          } else {
+            AsyncStorage.removeItem('@activeJourneys');
+          }
+          return updated;
+        });
+      }
+    });
+
+    return () => stopSub.remove();
   }, []);
 
   const loadData = async () => {
     try {
       const storedSettings = await AsyncStorage.getItem('@settings');
-      if (storedSettings) setSettings(JSON.parse(storedSettings));
+      if (storedSettings) setSettings({ ...defaultSettings, ...JSON.parse(storedSettings) });
 
       const storedPlaces = await AsyncStorage.getItem('@places');
       if (storedPlaces) setSavedPlaces(JSON.parse(storedPlaces));
@@ -76,22 +99,26 @@ export const AppProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const addJourney = async (journey: ActiveJourney) => {
-    const filtered = activeJourneys.filter(
-      j => j.destinationLat !== journey.destinationLat || j.destinationLng !== journey.destinationLng
-    );
-    const updated = [journey, ...filtered];
+    const isDuplicate = (j: ActiveJourney) => 
+      j.destinationName === journey.destinationName || 
+      (Math.abs(j.destinationLat - journey.destinationLat) < 0.0001 && Math.abs(j.destinationLng - journey.destinationLng) < 0.0001);
+      
+    const filtered = activeJourneys.filter(j => !isDuplicate(j));
+    const updated = [journey, ...filtered].slice(0, 3);
     setActiveJourneys(updated);
     await AsyncStorage.setItem('@activeJourneys', JSON.stringify(updated));
   };
 
   const updateJourneyStatus = async (id: string, isActive: boolean) => {
-    const updated = activeJourneys.map(j => j.id === id ? { ...j, isActive } : j);
-    setActiveJourneys(updated);
-    if (updated.length > 0) {
-      await AsyncStorage.setItem('@activeJourneys', JSON.stringify(updated));
-    } else {
-      await AsyncStorage.removeItem('@activeJourneys');
-    }
+    setActiveJourneys(prev => {
+      const updated = prev.map(j => j.id === id ? { ...j, isActive } : j);
+      if (updated.length > 0) {
+        AsyncStorage.setItem('@activeJourneys', JSON.stringify(updated));
+      } else {
+        AsyncStorage.removeItem('@activeJourneys');
+      }
+      return updated;
+    });
   };
 
   return (

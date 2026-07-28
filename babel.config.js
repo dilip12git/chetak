@@ -18,7 +18,6 @@ module.exports = {
           '@assets': './src/assets'
         }
       }
-    ],
-    'react-native-paper/babel'
+    ]
   ]
 };

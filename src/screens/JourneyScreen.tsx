@@ -13,8 +13,8 @@ import Geolocation from 'react-native-geolocation-service';
 type Props = NativeStackScreenProps<RootStackParamList, 'Journey'>;
 
 const JourneyScreen = ({ route, navigation }: Props) => {
-  const { id, destinationLat, destinationLng, destinationName, radius, routeDistance, routeDuration } = route.params;
-  const { updateJourneyStatus } = useContext(AppContext);
+  const { id, destinationLat, destinationLng, destinationName, radius, routeDistance, routeDuration, routeCoordinates } = route.params;
+  const { updateJourneyStatus, settings, activeJourneys } = useContext(AppContext);
   const insets = useSafeAreaInsets();
 
   const [currentLocation, setCurrentLocation] = useState<{ lat: number; lng: number } | null>(null);
@@ -42,7 +42,17 @@ const JourneyScreen = ({ route, navigation }: Props) => {
   }, []);
 
   const handleStopTracking = () => {
-    setIsStopModalVisible(true);
+    const currentJourney = activeJourneys.find((j: any) => j.id === id);
+    const playingJourney = AudioService.getPlayingJourney();
+    
+    const isContextArrived = currentJourney ? !currentJourney.isActive : false;
+    const isAlarmRingingForThis = playingJourney && playingJourney.id === id;
+
+    if (isContextArrived || isAlarmRingingForThis) {
+      confirmStop(); // Stop immediately if arrived or alarm is already ringing
+    } else {
+      setIsStopModalVisible(true);
+    }
   };
 
   const confirmStop = async () => {
@@ -55,31 +65,33 @@ const JourneyScreen = ({ route, navigation }: Props) => {
   };
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: settings.darkMode ? '#121212' : '#f8f9fa' }]}>
       <View style={styles.map}>
         <LeafletMap
           currentLocation={currentLocation}
           destination={{ lat: destinationLat, lng: destinationLng }}
           radius={radius}
+          routeCoordinates={routeCoordinates}
+          isDarkMode={settings.darkMode}
         />
       </View>
 
       <View style={[styles.topOverlay, { top: Math.max(insets.top, Platform.OS === 'android' ? 40 : 20) }]}>
-        <View style={styles.topCard}>
+        <View style={[styles.topCard, { backgroundColor: settings.darkMode ? 'rgba(30, 30, 30, 0.95)' : 'rgba(20, 20, 20, 0.95)' }]}>
           <Text style={styles.heading}>En Route To</Text>
           <Text style={styles.destName} numberOfLines={2}>{destinationName}</Text>
         </View>
       </View>
 
       <View style={[styles.bottomOverlay, { paddingBottom: Math.max(insets.bottom, 20) }]}>
-        <View style={styles.bottomCard}>
+        <View style={[styles.bottomCard, { backgroundColor: settings.darkMode ? '#1e1e1e' : '#ffffff' }]}>
           {routeDistance && routeDuration && (
             <View style={styles.metricsRow}>
               <View style={styles.metricBox}>
                 <Icon name="straighten" size={20} color="#16a34a" />
                 <View style={styles.metricTextWrapper}>
                   <Text style={styles.metricLabel}>DISTANCE</Text>
-                  <Text style={styles.metricValue}>
+                  <Text style={[styles.metricValue, { color: settings.darkMode ? '#fff' : '#101010' }]}>
                     {routeDistance > 1000 ? `${(routeDistance / 1000).toFixed(1)} km` : `${routeDistance.toFixed(0)} m`}
                   </Text>
                 </View>
@@ -89,7 +101,7 @@ const JourneyScreen = ({ route, navigation }: Props) => {
                 <Icon name="schedule" size={20} color="#16a34a" />
                 <View style={styles.metricTextWrapper}>
                   <Text style={styles.metricLabel}>ETA</Text>
-                  <Text style={styles.metricValue}>
+                  <Text style={[styles.metricValue, { color: settings.darkMode ? '#fff' : '#101010' }]}>
                     {Math.ceil(routeDuration / 60)} mins
                   </Text>
                 </View>
@@ -97,15 +109,15 @@ const JourneyScreen = ({ route, navigation }: Props) => {
             </View>
           )}
 
-          <View style={styles.statusBadge}>
+          <View style={[styles.statusBadge, { backgroundColor: settings.darkMode ? '#1e3a24' : '#f1fdf4' }]}>
             <Icon name="track-changes" size={16} color="#34C759" />
-            <Text style={styles.statusText}>
+            <Text style={[styles.statusText, { color: settings.darkMode ? '#4cd964' : '#16a34a' }]}>
               Alarm triggers at {(radius >= 1000) ? `${(radius / 1000).toFixed(1)} km` : `${radius} m`}
             </Text>
           </View>
         </View>
 
-        <TouchableOpacity style={styles.stopButton} onPress={handleStopTracking}>
+        <TouchableOpacity style={[styles.stopButton, { backgroundColor: settings.darkMode ? '#16a34a' : '#101010' }]} onPress={handleStopTracking}>
           <Icon name="close" size={22} color="#fff" />
           <Text style={styles.stopButtonText}>End Journey</Text>
         </TouchableOpacity>
@@ -113,16 +125,13 @@ const JourneyScreen = ({ route, navigation }: Props) => {
 
       <Modal visible={isStopModalVisible} transparent animationType="fade">
         <View style={styles.modalOverlay}>
-          <View style={styles.modalCard}>
-            <View style={styles.modalIconContainer}>
-              <Icon name="error-outline" size={32} color="#FF3B30" />
-            </View>
-            <Text style={styles.modalTitle}>End Journey?</Text>
-            <Text style={styles.modalText}>Your alarm will be cancelled and tracking will stop.</Text>
+          <View style={[styles.modalCard, { backgroundColor: settings.darkMode ? '#222' : '#ffffff' }]}>
+            <Text style={[styles.modalTitle, { color: settings.darkMode ? '#fff' : '#000' }]}>End Journey?</Text>
+            <Text style={[styles.modalText, { color: settings.darkMode ? '#aaa' : '#666' }]}>This will cancel your alarm and stop tracking.</Text>
             
             <View style={styles.modalButtonsRow}>
               <TouchableOpacity style={styles.modalCancelButton} onPress={() => setIsStopModalVisible(false)}>
-                <Text style={styles.modalCancelText}>Cancel</Text>
+                <Text style={[styles.modalCancelText, { color: settings.darkMode ? '#bbb' : '#555' }]}>Cancel</Text>
               </TouchableOpacity>
               
               <TouchableOpacity style={styles.modalConfirmButton} onPress={confirmStop}>
@@ -260,79 +269,60 @@ const styles = StyleSheet.create({
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.4)',
+    backgroundColor: 'rgba(0,0,0,0.5)',
     justifyContent: 'center',
     alignItems: 'center',
   },
   modalCard: {
     backgroundColor: '#ffffff',
-    width: '85%',
-    borderRadius: 28,
+    width: '80%',
+    borderRadius: 24,
     padding: 24,
-    alignItems: 'center',
+    alignItems: 'flex-start',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.15,
-    shadowRadius: 16,
-    elevation: 8,
-  },
-  modalIconContainer: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: '#fff0f0',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 16,
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.25,
+    shadowRadius: 20,
+    elevation: 15,
   },
   modalTitle: {
-    fontSize: 22,
-    fontWeight: '800',
-    color: '#1a1a1a',
+    fontSize: 20,
+    fontWeight: '700',
+    color: '#000',
     marginBottom: 8,
-    textAlign: 'center',
+    textAlign: 'left',
   },
   modalText: {
-    fontSize: 15,
+    fontSize: 14,
     color: '#666',
-    textAlign: 'center',
-    lineHeight: 22,
+    textAlign: 'left',
+    lineHeight: 20,
     marginBottom: 24,
-    paddingHorizontal: 10,
   },
   modalButtonsRow: {
     flexDirection: 'row',
     width: '100%',
-    justifyContent: 'space-between',
+    justifyContent: 'flex-end',
+    marginTop: 8,
   },
   modalCancelButton: {
-    flex: 1,
-    backgroundColor: '#f2f2f2',
-    paddingVertical: 14,
-    borderRadius: 16,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
     marginRight: 8,
-    alignItems: 'center',
   },
   modalCancelText: {
-    color: '#333',
-    fontWeight: '700',
-    fontSize: 16,
+    color: '#555',
+    fontWeight: '600',
+    fontSize: 15,
   },
   modalConfirmButton: {
-    flex: 1,
-    backgroundColor: '#FF3B30',
-    paddingVertical: 14,
-    borderRadius: 16,
-    marginLeft: 8,
-    alignItems: 'center',
-    shadowColor: '#FF3B30',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 4,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    backgroundColor: 'rgba(255, 59, 48, 0.1)',
+    borderRadius: 20,
   },
   modalConfirmText: {
-    color: '#fff',
+    color: '#FF3B30',
     fontWeight: '700',
     fontSize: 16,
   }

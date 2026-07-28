@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useContext } from 'react';
-import { View, StyleSheet, Text, TouchableOpacity, Alert, ScrollView, Modal, TouchableWithoutFeedback, SafeAreaView, Platform, StatusBar, DeviceEventEmitter, AppState, BackHandler, ActivityIndicator, ToastAndroid } from 'react-native';
+import { View, StyleSheet, Text, TouchableOpacity, Alert, ScrollView, Modal, TouchableWithoutFeedback, SafeAreaView, Platform, StatusBar, DeviceEventEmitter, AppState, BackHandler, ActivityIndicator, ToastAndroid, Pressable } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList, ActiveJourney } from '@appTypes';
@@ -8,7 +8,7 @@ import Geolocation from 'react-native-geolocation-service';
 import { requestLocationPermission } from '@utils/permissions';
 import { AppContext } from '@store/AppContext';
 import Icon from 'react-native-vector-icons/MaterialIcons';
-import FontIcon from 'react-native-vector-icons/FontAwesome';
+import { Settings2 } from 'lucide-react-native';
 import OSMAutocomplete from '@components/OSMAutocomplete';
 import NominatimService from '@services/NominatimService';
 import RoutingService, { RouteData } from '@services/RoutingService';
@@ -16,6 +16,7 @@ import Slider from '@react-native-community/slider';
 import LinearGradient from 'react-native-linear-gradient';
 import NetInfo from '@react-native-community/netinfo';
 import AudioService from '@services/AudioService';
+
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Home'>;
 
@@ -27,7 +28,7 @@ const HomeScreen = ({ navigation }: Props) => {
   const [selectedDestination, setSelectedDestination] = useState<{ lat: number; lng: number; name: string } | null>(null);
   const [routeData, setRouteData] = useState<RouteData | null>(null);
   const [isRouting, setIsRouting] = useState(false);
-  const [radius, setRadius] = useState<number>(1000);
+  const [radius, setRadius] = useState<number>(settings.defaultRadius || 1000);
   const [isAlarmsModalVisible, setIsAlarmsModalVisible] = useState(false);
   const [isConnected, setIsConnected] = useState<boolean>(true);
   const [triggeringJourney, setTriggeringJourney] = useState<ActiveJourney | null>(null);
@@ -138,6 +139,18 @@ const HomeScreen = ({ navigation }: Props) => {
     fetchRoute();
   }, [selectedDestination, currentLocation]);
 
+  useEffect(() => {
+    if (!selectedDestination) {
+      setRadius(settings.defaultRadius || 1000);
+    }
+  }, [settings.defaultRadius, selectedDestination]);
+
+  const handleMapPress = async (lat: number, lng: number) => {
+    // Reverse geocode the selected coordinate
+    const name = await NominatimService.reverseGeocode(lat, lng);
+    setSelectedDestination({ lat, lng, name });
+  };
+
   const handleStartTracking = async () => {
     if (selectedDestination) {
       const hasPermission = await requestLocationPermission();
@@ -164,6 +177,7 @@ const HomeScreen = ({ navigation }: Props) => {
         isActive: true,
         routeDistance: routeData?.distance,
         routeDuration: routeData?.duration,
+        routeCoordinates: routeData?.coordinates,
       };
 
       await addJourney(newJourney);
@@ -177,6 +191,7 @@ const HomeScreen = ({ navigation }: Props) => {
         radius: radius,
         routeDistance: routeData?.distance,
         routeDuration: routeData?.duration,
+        routeCoordinates: routeData?.coordinates,
       });
     }
   };
@@ -191,6 +206,7 @@ const HomeScreen = ({ navigation }: Props) => {
         radius: journey.radius,
         routeDistance: journey.routeDistance,
         routeDuration: journey.routeDuration,
+        routeCoordinates: journey.routeCoordinates,
       });
     } else {
       setSelectedDestination({
@@ -204,40 +220,46 @@ const HomeScreen = ({ navigation }: Props) => {
   };
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: settings.darkMode ? '#121212' : '#FEF9F5' }]}>
       <LinearGradient
-        colors={['rgba(255, 255, 255, 1)', 'rgba(255, 255, 255, 0.99)', 'rgba(255, 255, 255, 0)']}
+        colors={settings.darkMode ? ['rgba(18, 18, 18, 1)', 'rgba(18, 18, 18, 0.99)', 'rgba(18, 18, 18, 0)'] : ['rgba(255, 255, 255, 1)', 'rgba(255, 255, 255, 0.99)', 'rgba(255, 255, 255, 0)']}
         style={styles.topGradient}
         pointerEvents="none"
       />
       <View style={[styles.headerRow, { marginTop: Platform.OS === 'android' ? (StatusBar.currentHeight || 40) + 10 : Math.max(insets.top, 10) }]}>
         <View style={{ flexDirection: 'row', gap: 2 }}>
-          <Text style={[styles.appName, { color: '#101010' }]}>CHE</Text>
+          <Text style={[styles.appName, { color: settings.darkMode ? '#ffffff' : '#101010' }]}>CHE</Text>
           <Text style={[styles.appName, { color: '#16a34a' }]}>TAK</Text>
         </View>
-        <TouchableOpacity style={styles.alarmsButton} onPress={() => setIsAlarmsModalVisible(true)}>
-          <Icon name="alarm-on" size={16} color="#000" />
-          <Text style={styles.alarmsButtonText}>Alarms</Text>
-        </TouchableOpacity>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+          <TouchableOpacity style={[styles.alarmsButton, { backgroundColor: settings.darkMode ? '#222' : '#fff' }]} onPress={() => setIsAlarmsModalVisible(true)}>
+            <Icon name="alarm-on" size={16} color={'#16a34a'} />
+            <Text style={[styles.alarmsButtonText, { color: settings.darkMode ? '#fff' : '#000' }]}>Alarms</Text>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => navigation.navigate('Settings')} style={{ padding: 4 }}>
+            <Settings2 size={26} color={'#16a34a'} />
+          </TouchableOpacity>
+        </View>
       </View>
 
       <View style={styles.searchContainer}>
         <OSMAutocomplete
           onPlaceSelected={setSelectedDestination}
           placeholder="Search Destination"
+          currentLocation={currentLocation}
         />
         {savedPlaces.length > 0 && !selectedDestination && (
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.savedPlacesList} contentContainerStyle={styles.savedPlacesContent}>
             {savedPlaces.map(place => (
               <TouchableOpacity
                 key={place.id}
-                style={styles.savedPlaceCard}
+                style={[styles.savedPlaceCard, { backgroundColor: settings.darkMode ? '#1e1e1e' : '#ffffff' }]}
                 onPress={() => setSelectedDestination({ lat: place.latitude, lng: place.longitude, name: place.name })}
               >
-                <Icon name={place.icon || 'place'} size={20} color="#666" />
+                <Icon name={place.icon || 'place'} size={20} color={'#16a34a'} />
                 <View style={styles.savedPlaceTextContainer}>
                   {/* <Text style={styles.savedPlacePrefix}>To</Text> */}
-                  <Text style={styles.savedPlaceText} numberOfLines={1}>{place.name}</Text>
+                  <Text style={[styles.savedPlaceText, { color: settings.darkMode ? '#ddd' : '#333' }]} numberOfLines={1}>{place.name}</Text>
                 </View>
               </TouchableOpacity>
             ))}
@@ -251,7 +273,9 @@ const HomeScreen = ({ navigation }: Props) => {
             currentLocation={currentLocation}
             destination={selectedDestination}
             radius={radius}
-            onMapPress={() => setSelectedDestination(null)}
+            routeCoordinates={routeData?.coordinates}
+            isDarkMode={settings.darkMode}
+            onMapPress={handleMapPress}
           />
         </View>
       ) : (
@@ -262,12 +286,12 @@ const HomeScreen = ({ navigation }: Props) => {
 
       {selectedDestination ? (
         <View style={styles.bottomOverlay}>
-          <View style={styles.bottomSheetCard}>
+          <View style={[styles.bottomSheetCard, { backgroundColor: settings.darkMode ? '#1e1e1e' : '#ffffff' }]}>
             <Text style={styles.destNameHeader}>Destination</Text>
-            <Text style={styles.destName} numberOfLines={2}>{selectedDestination.name}</Text>
+            <Text style={[styles.destName, { color: settings.darkMode ? '#fff' : '#1a1a1a' }]} numberOfLines={2}>{selectedDestination.name}</Text>
 
             {isRouting ? (
-              <View style={styles.routeDataContainer}>
+              <View style={[styles.routeDataContainer,{ backgroundColor: settings.darkMode ? '#1e3a24' : '#f1fdf4' }]}>
                 <Text style={styles.routeDataText}>Calculating route...</Text>
               </View>
             ) : routeData ? (
@@ -276,7 +300,7 @@ const HomeScreen = ({ navigation }: Props) => {
                   <Icon name="straighten" size={20} color="#16a34a" />
                   <View style={styles.metricTextWrapper}>
                     <Text style={styles.metricLabel}>DISTANCE</Text>
-                    <Text style={styles.metricValue}>
+                    <Text style={[styles.metricValue, { color: settings.darkMode ? '#fff' : '#101010' }]}>
                       {routeData.distance > 1000 ? `${(routeData.distance / 1000).toFixed(1)} km` : `${routeData.distance.toFixed(0)} m`}
                     </Text>
                   </View>
@@ -286,7 +310,7 @@ const HomeScreen = ({ navigation }: Props) => {
                   <Icon name="schedule" size={20} color="#16a34a" />
                   <View style={styles.metricTextWrapper}>
                     <Text style={styles.metricLabel}>ETA</Text>
-                    <Text style={styles.metricValue}>
+                    <Text style={[styles.metricValue, { color: settings.darkMode ? '#fff' : '#101010' }]}>
                       {Math.ceil(routeData.duration / 60)} mins
                     </Text>
                   </View>
@@ -295,7 +319,7 @@ const HomeScreen = ({ navigation }: Props) => {
             ) : null}
 
             <View style={styles.sliderWrapper}>
-              <View style={styles.statusBadge}>
+              <View style={[styles.statusBadge,{ backgroundColor: settings.darkMode ? '#1e3a24' : '#f1fdf4' }]}>
                 <Icon name="track-changes" size={16} color="#34C759" />
                 <Text style={styles.statusText}>
                   Alert triggers at {(radius >= 1000) ? `${(radius / 1000).toFixed(1)} km` : `${radius} m`}
@@ -308,14 +332,14 @@ const HomeScreen = ({ navigation }: Props) => {
                 step={100}
                 value={radius}
                 onValueChange={setRadius}
-                minimumTrackTintColor="#000000"
-                maximumTrackTintColor="#d3d3d3"
-                thumbTintColor="#000000"
+                minimumTrackTintColor={settings.darkMode ? "#fff" : "#000000"}
+                maximumTrackTintColor={settings.darkMode ? "#444" : "#d3d3d3"}
+                thumbTintColor={settings.darkMode ? "#fff" : "#000000"}
               />
             </View>
 
-            <View style={styles.soundRow}>
-              <Text style={styles.soundText}>Voice & Alarm Alert</Text>
+            <View style={[styles.soundRow, { backgroundColor: settings.darkMode ? '#2c2c2c' : '#f9f9f9' }]}>
+              <Text style={[styles.soundText, { color: settings.darkMode ? '#ddd' : '#333' }]}>Voice & Alarm Alert</Text>
               <TouchableOpacity
                 style={styles.soundToggle}
                 onPress={() => updateSettings({ voiceAlert: !settings.voiceAlert })}
@@ -323,12 +347,12 @@ const HomeScreen = ({ navigation }: Props) => {
                 <Icon
                   name={settings.voiceAlert ? "volume-up" : "volume-off"}
                   size={28}
-                  color={settings.voiceAlert ? "#101010" : "#aaa"}
+                  color={settings.voiceAlert ? (settings.darkMode ? "#fff" : "#101010") : (settings.darkMode ? "#666" : "#aaa")}
                 />
               </TouchableOpacity>
             </View>
 
-            <TouchableOpacity style={styles.startButton} onPress={handleStartTracking}>
+            <TouchableOpacity style={[styles.startButton, { backgroundColor: settings.darkMode ? '#16a34a' : '#101010' }]} onPress={handleStartTracking}>
               <Text style={styles.startButtonText}>Start Journey</Text>
               <Icon name="arrow-forward" size={20} color="#fff" style={{ marginLeft: 8 }} />
             </TouchableOpacity>
@@ -337,17 +361,17 @@ const HomeScreen = ({ navigation }: Props) => {
       ) : (
         <>
           {triggeringJourney && (
-            <View style={styles.triggeringBanner}>
+            <View style={[styles.triggeringBanner, { backgroundColor: settings.darkMode ? '#1c1c1e' : '#ffffff' }]}>
               <View style={styles.triggeringInfo}>
                 <Icon name="notifications-active" size={24} color="#ff3b30" />
                 <View style={{ marginLeft: 12, flex: 1 }}>
                   <Text style={styles.triggeringTitle}>Alarm Triggered!</Text>
-                  <Text style={styles.triggeringDest} numberOfLines={1}>{triggeringJourney.destinationName || ""}</Text>
+                  <Text style={[styles.triggeringDest, { color: settings.darkMode ? '#ffffff' : '#000000' }]} numberOfLines={1}>{triggeringJourney.destinationName || ""}</Text>
                   {/* <Text style={styles.triggeringDest} numberOfLines={1}>CurrentLocation</Text> */}
                 </View>
               </View>
               <TouchableOpacity 
-                style={styles.triggeringStopBtn} 
+                style={[styles.triggeringStopBtn, { backgroundColor: settings.darkMode ? '#ff3b30' : '#101010' }]} 
                 onPress={() => {
                   AudioService.stopAlarm();
                   setTriggeringJourney(null);
@@ -363,11 +387,12 @@ const HomeScreen = ({ navigation }: Props) => {
               : styles.currentLocationWrapper
           }>
             <TouchableOpacity 
-              style={
+              style={[
                 (currentAddress === 'Loading location...' || currentAddress === 'Location unavailable' || currentAddress === 'Permission denied' || currentAddress === 'Unknown Location')
                   ? styles.currentLocationSheetSmall
-                  : styles.currentLocationSheet
-              }
+                  : styles.currentLocationSheet,
+                { backgroundColor: settings.darkMode ? '#1e1e1e' : '#ffffff' }
+              ]}
               onPress={() => {
                 if (currentAddress === 'Location unavailable' || currentAddress === 'Permission denied' || currentAddress === 'Unknown Location') {
                   fetchLocation(true);
@@ -381,8 +406,8 @@ const HomeScreen = ({ navigation }: Props) => {
                 <ActivityIndicator size="small" color="#16a34a" />
               ) : (
                 <>
-                  <Icon name="my-location" size={20} color="#000" />
-                  <Text style={styles.currentLocationText} numberOfLines={2}>
+                  <Icon name="my-location" size={20} color={'#16a34a'} />
+                  <Text style={[styles.currentLocationText, { color: settings.darkMode ? '#ddd' : '#333' }]} numberOfLines={2}>
                     {currentAddress}
                   </Text>
                 </>
@@ -398,47 +423,60 @@ const HomeScreen = ({ navigation }: Props) => {
         transparent={true}
         onRequestClose={() => setIsAlarmsModalVisible(false)}
       >
-        <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setIsAlarmsModalVisible(false)}>
-          <View style={styles.modalContent}>
+        <View style={styles.modalOverlay}>
+          <Pressable style={StyleSheet.absoluteFill} onPress={() => setIsAlarmsModalVisible(false)} />
+          <View style={[styles.modalContent, { backgroundColor: settings.darkMode ? '#121212' : '#fff' }]}>
             <View style={styles.modalDragPill} />
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Active Alarms</Text>
+              <Text style={[styles.modalTitle, { color: settings.darkMode ? '#fff' : '#1a1a1a' }]}>Active Alarms</Text>
+              <Text style={{ color: settings.darkMode ? '#aaa' : '#666', fontSize: 14, marginTop: 6, marginBottom: 10 }}>You will be alerted before reaching your stop.</Text>
             </View>
             {activeJourneys.length > 0 ? (
-              <ScrollView>
+              <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 0 }}>
                 {[...activeJourneys].sort((a, b) => Number(b.isActive) - Number(a.isActive)).map((journey) => (
-                  <TouchableOpacity key={journey.id} style={[styles.activeJourneyCard, { marginBottom: 10 }]} onPress={() => {
+                  <TouchableOpacity key={journey.id} style={[styles.activeJourneyCard, { backgroundColor: settings.darkMode ? '#222' : '#fff', borderColor: journey.isActive ? '#16a34a' : (settings.darkMode ? '#333' : '#eee'), marginBottom: 12 }]} onPress={() => {
                     setIsAlarmsModalVisible(false);
                     handleResumeJourney(journey);
                   }}>
                     <View style={styles.activeJourneyInfo}>
-                      <Icon name="alarm" size={24} color={journey.isActive ? "#34C759" : "#666"} />
+                      <Icon name="alarm" size={40} color={journey.isActive ? "#16a34a" : (settings.darkMode ? "#666" : "#999")} style={{ marginRight: 16 }} />
                       <View style={styles.activeJourneyTextContainer}>
                         <View style={styles.activeJourneyTitleContainer}>
-                          <Text style={[styles.activeJourneyTitle, journey.isActive && { color: "#34C759" }]}>
-                            {journey.isActive ? "Active Journey" : "Inactive Journey"}
-                          </Text>
-                          {journey.isActive ? (
-                            <Icon name="chevron-right" size={24} color="#000" />
-                          ) : (
+                          <View style={{ backgroundColor: journey.isActive ? 'rgba(22, 163, 74, 0.1)' : (settings.darkMode ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)'), paddingHorizontal: 8, paddingVertical: 4, borderRadius: 12, borderWidth: 1, borderColor: journey.isActive ? 'rgba(22, 163, 74, 0.2)' : 'rgba(150,150,150,0.2)' }}>
+                            <Text style={[styles.activeJourneyTitle, { color: journey.isActive ? "#16a34a" : (settings.darkMode ? "#aaa" : "#666") }]}>
+                              {journey.isActive ? "ACTIVE JOURNEY" : "INACTIVE JOURNEY"}
+                            </Text>
+                          </View>
+                          {/* {!journey.isActive && (
                             <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                              <Text style={{ color: '#34C759', fontWeight: '600', marginRight: 5 }}>Start Again</Text>
-                              <FontIcon name="angle-right" size={20} color="#34C759" />
+                              <Text style={{ color: '#16a34a', fontWeight: '500', fontSize: 14, marginRight: 2 }}>Start Again</Text>
+                              <Icon name="chevron-right" size={18} color="#16a34a" />
                             </View>
-                          )}
+                          )} */}
                         </View>
-                        <Text style={styles.activeJourneyDest} numberOfLines={1}>{journey.destinationName}</Text>
+                        <Text style={[styles.activeJourneyDest, { color: settings.darkMode ? '#e0e0e0' : '#111', fontSize: 16, marginTop: 4 }]} numberOfLines={1}>{journey.destinationName}</Text>
+                        <Text style={[styles.activeJourneySubtitle, { color: settings.darkMode ? '#888' : '#666', marginTop: 2 }]}>{journey.isActive ? "You will be alerted for this stop" : "Tap Start Again to activate"}</Text>
                       </View>
+                      {journey.isActive && (
+                        <Icon name="chevron-right" size={28} color={settings.darkMode ? "#fff" : "#111"} style={{ marginLeft: 8 }} />
+                      )}
                     </View>
-
                   </TouchableOpacity>
                 ))}
+                
+                <View style={[styles.infoCard, { borderColor: '#16a34a', backgroundColor: settings.darkMode ? '#0a1a0f' : '#f0fdf4' }]}>
+                  <Icon name="verified-user" size={24} color="#16a34a" />
+                  <View style={{ marginLeft: 12, flex: 1 }}>
+                    <Text style={{ color: settings.darkMode ? '#ddd' : '#111', fontSize: 13, fontWeight: '600' }}>Multiple active alarms supported.</Text>
+                    <Text style={{ color: settings.darkMode ? '#aaa' : '#666', fontSize: 12, marginTop: 2 }}>You can track up to 3 alarms simultaneously. The app monitors all active journeys.</Text>
+                  </View>
+                </View>
               </ScrollView>
             ) : (
-              <Text style={styles.noAlarmsText}>No active alarms set.</Text>
+              <Text style={[styles.noAlarmsText, { color: settings.darkMode ? '#aaa' : '#666' }]}>No active alarms set.</Text>
             )}
           </View>
-        </TouchableOpacity>
+        </View>
       </Modal>
 
     </View>
@@ -525,8 +563,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     marginRight: 10,
-    elevation: 0,
-    shadowColor: 'transparent',
+     elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
     width: 200,
   },
   savedPlaceTextContainer: {
@@ -664,26 +705,36 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   activeJourneyTextContainer: {
-    marginLeft: 12,
     flex: 1,
   },
   activeJourneyTitle: {
-    color: '#666',
-    fontSize: 12,
+    fontSize: 10,
     fontWeight: '700',
     textTransform: 'uppercase',
-    letterSpacing: 1,
+    letterSpacing: 0.5,
   },
   activeJourneyTitleContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between'
+    justifyContent: 'space-between',
+    marginBottom: 6,
   },
   activeJourneyDest: {
-    color: '#000',
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '600',
-    marginTop: 2,
+    marginBottom: 2,
+  },
+  activeJourneySubtitle: {
+    fontSize: 12,
+    fontWeight: '400',
+  },
+  infoCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    borderRadius: 16,
+    borderWidth: 1,
+    marginTop: 10,
   },
   currentLocationText: {
     marginLeft: 12,
@@ -830,9 +881,10 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,1)',
     borderTopLeftRadius: 30,
     borderTopRightRadius: 30,
-    padding: 30,
+    padding: 24,
     paddingTop: 15,
-    paddingBottom: 50,
+    paddingBottom: 24,
+    maxHeight: '70%',
   },
   modalDragPill: {
     width: 40,
@@ -844,7 +896,7 @@ const styles = StyleSheet.create({
   },
   modalHeader: {
     alignItems: 'center',
-    marginBottom: 20,
+    marginBottom: 10,
   },
   modalTitle: {
     fontSize: 20,

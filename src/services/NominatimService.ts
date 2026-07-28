@@ -29,24 +29,49 @@ const checkNetworkAndToast = async () => {
 };
 
 class NominatimService {
-  async search(query: string): Promise<NominatimResult[]> {
+  async search(query: string, currentLat?: number, currentLng?: number): Promise<NominatimResult[]> {
     if (!query || query.length < 3) return [];
 
     try {
       await checkNetworkAndToast();
-      const response = await axios.get<NominatimResult[]>(`${NOMINATIM_BASE_URL}/search`, {
-        params: {
-          q: query,
-          format: 'json',
-          addressdetails: 1,
-          limit: 5,
-        },
-        headers: HEADERS,
+      
+      const params: any = {
+        q: query,
+        limit: 5,
+      };
+      
+      if (currentLat !== undefined && currentLng !== undefined) {
+        params.lat = currentLat;
+        params.lon = currentLng;
+        params.zoom = 8; // Zoom level 8 is approximately state/regional level bias
+        params.location_bias_scale = 1;
+      }
+
+      const response = await axios.get('https://photon.komoot.io/api/', {
+        params,
         timeout: 10000,
       });
-      return response.data;
+
+      const features = response.data?.features || [];
+      return features.map((f: any, index: number) => {
+        const props = f.properties;
+        const coords = f.geometry.coordinates; // [lon, lat]
+        
+        // Construct a clean display name avoiding duplicates
+        const nameParts = [props.name, props.street, props.city, props.state, props.country].filter(Boolean);
+        const uniqueNameParts = Array.from(new Set(nameParts));
+        const displayName = uniqueNameParts.join(', ');
+
+        return {
+          place_id: props.osm_id || index,
+          lat: coords[1].toString(),
+          lon: coords[0].toString(),
+          display_name: displayName || 'Unknown Location',
+          type: props.osm_value || 'place'
+        };
+      });
     } catch (error) {
-      console.error('Nominatim search failed:', error);
+      console.error('Photon search failed:', error);
       throw error;
     }
   }

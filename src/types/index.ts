@@ -1,7 +1,7 @@
 export type RootStackParamList = {
   Splash: undefined;
   Home: undefined;
-  Journey: { id: string; destinationLat: number; destinationLng: number; destinationName: string; radius: number; routeDistance?: number; routeDuration?: number };
+  Journey: { id: string; destinationLat: number; destinationLng: number; destinationName: string; radius: number; routeDistance?: number; routeDuration?: number; routeCoordinates?: [number, number][] };
   SavedPlaces: undefined;
   Settings: undefined;
 };
@@ -24,7 +24,10 @@ export interface AppSettings {
   darkMode: boolean;
   alarmVolume: number; // 0.0 to 1.0
   alarmSound: string;
+  alarmSoundName: string;
+  soundAlert: boolean;
   voiceAlert: boolean;
+  vibrationMode: boolean;
   defaultRadius: number; // in meters
 }
 
@@ -37,4 +40,5 @@ export interface ActiveJourney {
   isActive: boolean;
   routeDistance?: number;
   routeDuration?: number;
+  routeCoordinates?: [number, number][];
 }

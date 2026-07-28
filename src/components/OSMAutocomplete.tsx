@@ -1,15 +1,19 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useContext } from 'react';
 import { View, TextInput, FlatList, Text, TouchableOpacity, StyleSheet, ActivityIndicator, Keyboard, ToastAndroid, Platform, Alert } from 'react-native';
 import NominatimService, { NominatimResult } from '@services/NominatimService';
-import Icon from 'react-native-vector-icons/MaterialIcons';
+import { AppContext } from '@store/AppContext';
 import NetInfo from '@react-native-community/netinfo';
+import Icon from 'react-native-vector-icons/MaterialIcons';
+import EvilIcons from 'react-native-vector-icons/EvilIcons';
 
 interface Props {
   onPlaceSelected: (details: { lat: number; lng: number; name: string }) => void;
   placeholder?: string;
+  currentLocation?: { lat: number; lng: number } | null;
 }
 
-const OSMAutocomplete: React.FC<Props> = ({ onPlaceSelected, placeholder = 'Search Destination' }) => {
+const OSMAutocomplete: React.FC<Props> = ({ onPlaceSelected, placeholder = 'Search Destination', currentLocation }) => {
+  const { settings } = useContext(AppContext);
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<NominatimResult[]>([]);
   const [loading, setLoading] = useState(false);
@@ -42,7 +46,7 @@ const OSMAutocomplete: React.FC<Props> = ({ onPlaceSelected, placeholder = 'Sear
       setLoading(true);
       setError('');
       try {
-        const data = await NominatimService.search(query);
+        const data = await NominatimService.search(query, currentLocation?.lat, currentLocation?.lng);
         setResults(data);
         setShowDropdown(true);
       } catch (err) {
@@ -75,14 +79,14 @@ const OSMAutocomplete: React.FC<Props> = ({ onPlaceSelected, placeholder = 'Sear
 
   return (
     <View style={styles.container}>
-      <View style={styles.inputContainer}>
-        <View style={styles.searchIconWrapper}>
-          <Icon name="search" size={24} color="#16a34a" />
+      <View style={[styles.inputContainer, { backgroundColor: settings.darkMode ? '#1e1e1e' : '#fff' }]}>
+        <View style={[styles.searchIconWrapper, { backgroundColor: settings.darkMode ? '#1e3a24' : '#e7ffe6ff' }]}>
+          <Icon name="search" size={24} color={settings.darkMode ? '#4cd964' : '#16a34a'} />
         </View>
         <TextInput
-          style={styles.input}
+          style={[styles.input, { color: settings.darkMode ? '#fff' : '#000' }]}
           placeholder={placeholder}
-          placeholderTextColor="#888"
+          placeholderTextColor={settings.darkMode ? '#aaa' : '#888'}
           value={query}
           onChangeText={setQuery}
           onFocus={() => {
@@ -91,19 +95,19 @@ const OSMAutocomplete: React.FC<Props> = ({ onPlaceSelected, placeholder = 'Sear
         />
         {query.length > 0 && (
           <TouchableOpacity onPress={handleClear} style={styles.clearIcon}>
-            <Icon name="close" size={24} color="#666" />
+            <Icon name="close" size={24} color={settings.darkMode ? '#aaa' : '#666'} />
           </TouchableOpacity>
         )}
       </View>
 
       {showDropdown && (
-        <View style={styles.dropdown}>
+        <View style={[styles.dropdown, { backgroundColor: settings.darkMode ? '#1e1e1e' : '#fff' }]}>
           {loading ? (
-            <ActivityIndicator style={styles.loader} size="small" color="#00ff51ff" />
+            <ActivityIndicator style={styles.loader} size="small" color={settings.darkMode ? '#4cd964' : '#00ff51ff'} />
           ) : error ? (
             <Text style={styles.errorText}>{error}</Text>
           ) : results.length === 0 ? (
-            <Text style={styles.emptyText}>No results found.</Text>
+            <Text style={[styles.emptyText, { color: settings.darkMode ? '#aaa' : '#666' }]}>No results found.</Text>
           ) : (
             <FlatList
               data={results}
@@ -111,11 +115,11 @@ const OSMAutocomplete: React.FC<Props> = ({ onPlaceSelected, placeholder = 'Sear
               keyboardShouldPersistTaps="handled"
               renderItem={({ item, index }) => (
                 <TouchableOpacity 
-                  style={[styles.resultItem, index === results.length - 1 && { borderBottomWidth: 0 }]} 
+                  style={[styles.resultItem, { borderBottomColor: settings.darkMode ? '#333' : '#eee' }, index === results.length - 1 && { borderBottomWidth: 0 }]} 
                   onPress={() => handleSelect(item)}
                 >
-                  <Icon name="place" size={24} color="#000000" />
-                  <Text style={styles.resultText} numberOfLines={2}>
+                  <EvilIcons name="location" size={24} color={'#16a34a'} />
+                  <Text style={[styles.resultText, { color: settings.darkMode ? '#fff' : '#333' }]} numberOfLines={2}>
                     {item.display_name}
                   </Text>
                 </TouchableOpacity>

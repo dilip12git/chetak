@@ -86,7 +86,14 @@ class LocationService {
               if (distance <= journey.radius) {
                 // Arrived at this destination!
                 anyArrived = true;
-                this.triggerArrival(journey, settings?.alarmVolume ?? 1.0, settings?.voiceAlert ?? true);
+                this.triggerArrival(
+                  journey,
+                  settings?.alarmVolume ?? 1.0,
+                  settings?.voiceAlert ?? true,
+                  settings?.alarmSound ?? 'default',
+                  settings?.vibrationMode ?? true,
+                  settings?.soundAlert ?? true
+                );
 
                 // Set to inactive instead of removing
                 const jIndex = remainingJourneys.findIndex(j => j.id === journey.id);
@@ -129,12 +136,20 @@ class LocationService {
     });
   };
 
-  private async triggerArrival(journey: ActiveJourney, volume: number, voiceAlert: boolean) {
+  private async triggerArrival(
+    journey: ActiveJourney,
+    volume: number,
+    voiceAlert: boolean,
+    soundFile: string = 'default',
+    vibrationMode: boolean = true,
+    soundAlert: boolean = true
+  ) {
     const channelId = await notifee.createChannel({
-      id: 'alarm',
+      id: 'arrival_alarm_v2',
       name: 'Arrival Alarm',
       importance: AndroidImportance.HIGH,
       sound: 'default',
+      vibration: false,
     });
 
     await notifee.displayNotification({
@@ -155,7 +170,7 @@ class LocationService {
       },
     });
 
-    AudioService.playAlarm(volume, journey);
+    AudioService.playAlarm(volume, journey, soundFile, vibrationMode, soundAlert);
     if (voiceAlert) {
       AudioService.speak(`Your destination, ${journey.destinationName}, has arrived. Please prepare to disembark.`);
     }

@@ -1,6 +1,6 @@
 import Sound from 'react-native-sound';
 import Tts from 'react-native-tts';
-import { Vibration, DeviceEventEmitter } from 'react-native';
+import { Vibration, DeviceEventEmitter, NativeModules } from 'react-native';
 
 // Enable playback in silence mode
 Sound.setCategory('Playback');
@@ -17,7 +17,7 @@ class AudioService {
     // Add additional TTS configuration if necessary
   }
 
-  playAlarm(volume: number, journey?: any, soundFile: string = 'default') {
+  playAlarm(volume: number, journey?: any, soundFile: string = 'default', vibrationMode: boolean = true, soundAlert: boolean = true) {
     if (this.isPlaying) return;
     this.isPlaying = true;
     this.isStopped = false;
@@ -25,31 +25,45 @@ class AudioService {
 
     DeviceEventEmitter.emit('ALARM_STARTED', { journey });
 
-    this.alarmSound = new Sound('alram.wav', Sound.MAIN_BUNDLE, (error) => {
-      if (error) {
-        console.log('Failed to load the sound', error);
-        this.isPlaying = false;
-        return;
-      }
-      
-      if (this.isStopped) {
-        this.alarmSound?.release();
-        this.alarmSound = null;
-        this.isPlaying = false;
-        return;
-      }
-
-      this.alarmSound?.setVolume(volume);
-      this.alarmSound?.setNumberOfLoops(-1); // Infinite loop
-      this.alarmSound?.play((success) => {
-        if (!success) {
-          console.log('Playback failed due to audio decoding errors');
+    if (soundFile === 'default') {
+      try {
+        if (vibrationMode) {
+          NativeModules.RingtonePicker?.startAlarmVibration();
         }
-      });
-    });
+      } catch (e) {}
 
-    // Start continuous vibration pattern
-    Vibration.vibrate([1000, 1000], true);
+      if (soundAlert) {
+        this.alarmSound = new Sound('alram.wav', Sound.MAIN_BUNDLE, (error) => {
+          if (error) {
+            console.log('Failed to load the sound', error);
+            this.isPlaying = false;
+            return;
+          }
+          
+          if (this.isStopped) {
+            this.alarmSound?.release();
+            this.alarmSound = null;
+            this.isPlaying = false;
+            return;
+          }
+
+          this.alarmSound?.setVolume(volume);
+          this.alarmSound?.setNumberOfLoops(-1); // Infinite loop
+          this.alarmSound?.play();
+        });
+      }
+    } else {
+      // It's a custom ringtone URI from RingtonePicker
+      try {
+        if (soundAlert) {
+          NativeModules.RingtonePicker?.playRingtone(soundFile, vibrationMode);
+        } else if (vibrationMode) {
+          NativeModules.RingtonePicker?.startAlarmVibration();
+        }
+      } catch (e) {
+        console.log('Failed to play native ringtone', e);
+      }
+    }
   }
 
   stopAlarm() {
@@ -60,11 +74,16 @@ class AudioService {
         this.alarmSound = null;
       });
     }
+    
+    try {
+      NativeModules.RingtonePicker?.stopRingtone();
+    } catch(e) {}
     Vibration.cancel();
     Tts.stop();
     this.isPlaying = false;
+    const stoppedJourney = this.playingJourney;
     this.playingJourney = null;
-    DeviceEventEmitter.emit('ALARM_STOPPED');
+    DeviceEventEmitter.emit('ALARM_STOPPED', { journey: stoppedJourney });
   }
 
   getPlayingJourney() {

@@ -7,10 +7,12 @@ interface LeafletMapProps {
   currentLocation?: { lat: number; lng: number } | null;
   destination?: { lat: number; lng: number } | null;
   radius?: number; // in meters
-  onMapPress?: () => void;
+  routeCoordinates?: [number, number][]; // [lat, lng] array for route
+  isDarkMode?: boolean;
+  onMapPress?: (lat: number, lng: number) => void;
 }
 
-const LeafletMap: React.FC<LeafletMapProps> = ({ currentLocation, destination, radius, onMapPress }) => {
+const LeafletMap: React.FC<LeafletMapProps> = ({ currentLocation, destination, radius, routeCoordinates, isDarkMode, onMapPress }) => {
   const webviewRef = useRef<WebView>(null);
   const [isLoaded, setIsLoaded] = useState(false);
 
@@ -24,6 +26,14 @@ const LeafletMap: React.FC<LeafletMapProps> = ({ currentLocation, destination, r
       <style>
         body { padding: 0; margin: 0; }
         html, body, #map { height: 100%; width: 100vw; background-color: #f0f0f0; }
+        
+        body.dark-mode { background-color: #121212; }
+        body.dark-mode .leaflet-layer,
+        body.dark-mode .leaflet-control-zoom-in,
+        body.dark-mode .leaflet-control-zoom-out,
+        body.dark-mode .leaflet-control-attribution {
+          filter: invert(100%) hue-rotate(180deg) brightness(95%) contrast(90%);
+        }
       </style>
     </head>
     <body>
@@ -38,9 +48,10 @@ const LeafletMap: React.FC<LeafletMapProps> = ({ currentLocation, destination, r
         var currentMarker = null;
         var destMarker = null;
         var radiusCircle = null;
+        var routePolyline = null;
 
         map.on('click', function(e) {
-          window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'mapPress' }));
+          window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'mapPress', lat: e.latlng.lat, lng: e.latlng.lng }));
         });
 
         // Initialize Blue Dot for user
@@ -53,7 +64,7 @@ const LeafletMap: React.FC<LeafletMapProps> = ({ currentLocation, destination, r
 
         // Red pin for destination
         var destIcon = L.icon({
-          iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-black.png',
+          iconUrl: 'https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-red.png',
           shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png',
           iconSize: [25, 41],
           iconAnchor: [12, 41],
@@ -63,6 +74,12 @@ const LeafletMap: React.FC<LeafletMapProps> = ({ currentLocation, destination, r
 
         window.updateMap = function(data) {
           try {
+            if (data.isDarkMode) {
+              document.body.classList.add('dark-mode');
+            } else {
+              document.body.classList.remove('dark-mode');
+            }
+
             if (data.currentLocation) {
               if (!currentMarker) {
                 currentMarker = L.marker([data.currentLocation.lat, data.currentLocation.lng], { icon: userIcon }).addTo(map);
@@ -81,8 +98,8 @@ const LeafletMap: React.FC<LeafletMapProps> = ({ currentLocation, destination, r
               if (data.radius) {
                 if (!radiusCircle) {
                   radiusCircle = L.circle([data.destination.lat, data.destination.lng], {
-                    color: '#1d1c1cff',
-                    fillColor: '#1d1c1cff',
+                    color: 'green',
+                    fillColor: 'green',
                     fillOpacity: 0.1,
                     radius: data.radius
                   }).addTo(map);
@@ -94,6 +111,16 @@ const LeafletMap: React.FC<LeafletMapProps> = ({ currentLocation, destination, r
             } else {
               if (destMarker) { map.removeLayer(destMarker); destMarker = null; }
               if (radiusCircle) { map.removeLayer(radiusCircle); radiusCircle = null; }
+            }
+
+            if (data.routeCoordinates && data.routeCoordinates.length > 0) {
+              if (!routePolyline) {
+                routePolyline = L.polyline(data.routeCoordinates, { color: 'green', weight: 4 }).addTo(map);
+              } else {
+                routePolyline.setLatLngs(data.routeCoordinates);
+              }
+            } else {
+              if (routePolyline) { map.removeLayer(routePolyline); routePolyline = null; }
             }
 
             // Adjust view to fit both or either
@@ -123,10 +150,10 @@ const LeafletMap: React.FC<LeafletMapProps> = ({ currentLocation, destination, r
 
   useEffect(() => {
     if (isLoaded && webviewRef.current) {
-      const data = JSON.stringify({ currentLocation, destination, radius });
+      const data = JSON.stringify({ currentLocation, destination, radius, routeCoordinates, isDarkMode });
       webviewRef.current.injectJavaScript(`window.updateMap(${data}); true;`);
     }
-  }, [currentLocation, destination, radius, isLoaded]);
+  }, [currentLocation, destination, radius, routeCoordinates, isDarkMode, isLoaded]);
 
   return (
     <View style={styles.container}>
@@ -143,7 +170,7 @@ const LeafletMap: React.FC<LeafletMapProps> = ({ currentLocation, destination, r
           try {
             const data = JSON.parse(event.nativeEvent.data);
             if (data.type === 'mapPress' && onMapPress) {
-              onMapPress();
+              onMapPress(data.lat, data.lng);
             }
           } catch (e) {}
         }}

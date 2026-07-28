@@ -4,6 +4,7 @@ import NetInfo from '@react-native-community/netinfo';
 export interface RouteData {
   distance: number; // in meters
   duration: number; // in seconds
+  coordinates?: [number, number][]; // [lat, lng] array
 }
 
 const checkNetworkAndToast = async () => {
@@ -37,7 +38,7 @@ class RoutingService {
       await checkNetworkAndToast();
       
       // OSRM expects coordinates in lon,lat format
-      const url = `https://router.project-osrm.org/route/v1/driving/${startLng},${startLat};${destLng},${destLat}?overview=false`;
+      const url = `https://router.project-osrm.org/route/v1/driving/${startLng},${startLat};${destLng},${destLat}?overview=full&geometries=geojson`;
       
       const response = await fetch(url);
       if (!response.ok) {
@@ -47,9 +48,13 @@ class RoutingService {
       const data = await response.json();
       
       if (data.code === 'Ok' && data.routes && data.routes.length > 0) {
+        const route = data.routes[0];
+        const coordinates = route.geometry?.coordinates?.map((c: [number, number]) => [c[1], c[0]]) || [];
+        
         return {
-          distance: data.routes[0].distance,
-          duration: data.routes[0].duration,
+          distance: route.distance,
+          duration: route.duration,
+          coordinates,
         };
       }
       
